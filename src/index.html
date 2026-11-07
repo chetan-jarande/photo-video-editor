@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data: blob:">
+<title>Story Editor</title>
+<link rel="icon" href="icon.svg">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="brand"><img src="icon.svg" alt="Story Editor logo"><span>Story Editor</span></div>
+  <button class="btn proj-only" id="homeBtn" data-tip="Save and go to your projects"><svg viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>Projects</button>
+  <input id="projName" class="proj-only" spellcheck="false" aria-label="Project name" data-tip="Rename">
+  <span id="saveStatus" class="proj-only"></span>
+  <button class="btn" id="openBtn" data-tip="Open photo or video (Ctrl+O)"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>Open</button>
+  <div class="divider"></div>
+  <button class="iconbtn" id="undoBtn" data-tip="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+  <button class="iconbtn" id="redoBtn" data-tip="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+  <div class="spacer"></div>
+  <button class="btn" id="musicBtn" data-tip="Add a song to the export"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Add music</button>
+  <div id="musicPill" hidden>
+    <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    <span id="musicName"></span>
+    <label data-tip="Start the song at this second">from <input type="number" id="musicOffset" min="0" step="1" value="0">s</label>
+    <button id="musicRemove" class="x" aria-label="Remove music" data-tip="Remove music"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <input type="file" id="musicInput" accept="audio/*" hidden>
+  <div id="progress" hidden><div id="progressFill"></div><span id="progressText">Exporting</span></div>
+  <select id="exportFormat" aria-label="Image format"><option value="png">PNG</option><option value="jpeg">JPG</option><option value="mp4">Video (MP4)</option></select>
+  <select id="stillDur" aria-label="Video length" hidden><option value="5">5 s</option><option value="10">10 s</option><option value="15">15 s</option></select>
+  <button class="btn primary" id="exportBtn" data-tip="Export (Ctrl+E)"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>Export</button>
+</header>
+
+<nav id="rail">
+  <button data-tool="select" data-tip="Select (V)" aria-label="Select"><svg viewBox="0 0 24 24"><path d="M4.5 3.5l15 6-6.3 2.2-2.2 6.3z"/><path d="M13.5 13.5l5 5"/></svg><span>Select</span></button>
+  <button data-tool="text" data-tip="Text (T)" aria-label="Text"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M12 4v16"/><path d="M9 20h6"/></svg><span>Text</span></button>
+  <button data-tool="draw" data-tip="Draw (D)" aria-label="Draw"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><span>Draw</span></button>
+  <button data-tool="stickers" data-tip="Stickers (S)" aria-label="Stickers"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg><span>Stickers</span></button>
+  <button data-tool="adjust" data-tip="Filters and adjust (A)" aria-label="Adjust"><svg viewBox="0 0 24 24"><path d="M4 7h9M18 7h2M4 17h3M12 17h8"/><circle cx="15.5" cy="7" r="2.5"/><circle cx="9.5" cy="17" r="2.5"/></svg><span>Adjust</span></button>
+  <button data-tool="layers" data-tip="Layers (L)" aria-label="Layers"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg><span>Layers</span></button>
+</nav>
+
+<main id="center">
+  <div id="stage">
+    <canvas id="c"></canvas>
+
+    <div id="welcome">
+      <div class="welcome-inner">
+        <h1>Create a story</h1>
+        <p class="lead">Open a photo or video, then add text in any font, Marathi included.</p>
+        <button id="welcomeOpen" class="dropzone">
+          <span class="dz-icon"><svg viewBox="0 0 24 24"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></span>
+          <span class="dz-title">Open photo or video</span>
+          <span class="dz-sub">or drop a file here. Font files work too.</span>
+        </button>
+        <div class="starts">
+          <span class="starts-label">Or start blank</span>
+          <div class="ratio-row">
+            <button class="ratio" data-w="1080" data-h="1920"><i class="r916"></i><b>Story</b><small>9:16</small></button>
+            <button class="ratio" data-w="1080" data-h="1350"><i class="r45"></i><b>Post</b><small>4:5</small></button>
+            <button class="ratio" data-w="1080" data-h="1080"><i class="r11"></i><b>Square</b><small>1:1</small></button>
+          </div>
+        </div>
+        <section id="projects">
+          <div class="proj-head"><h2>Your projects</h2><input type="search" id="projSearch" placeholder="Search projects" hidden></div>
+          <div id="projGrid"></div>
+          <p id="projEmpty" class="hint" hidden>Projects you edit appear here automatically.</p>
+        </section>
+      </div>
+    </div>
+
+    <div id="editBar" class="glass">
+      <button id="eAlign" class="ebtn" data-tip="Align" aria-label="Align"><svg viewBox="0 0 24 24"><path id="eAlignPath" d="M3 6h18M7 12h10M5 18h14"/></svg></button>
+      <button id="eBg" class="ebtn abtn" data-tip="Text background" aria-label="Text background">A</button>
+      <button id="eFx" class="ebtn fx" data-tip="Effect" aria-label="Effect"><svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 17v4M17 19h4"/></svg><span id="eFxLabel">None</span></button>
+      <button id="eAnim" class="ebtn fx" data-tip="Animate" aria-label="Animate"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l5 3.5-5 3.5z"/></svg><span id="eAnimLabel">Animate</span></button>
+      <button id="eDone" class="done" data-tip="Done (Esc)">Done</button>
+    </div>
+    <div id="topStrips"><div id="styleStrip" class="strip"></div><div id="animStrip" class="strip"></div></div>
+    <div id="sizeRail" class="glass" data-tip="Text size"><input type="range" id="sizeV" min="8" max="400" step="1" aria-label="Text size"></div>
+    <div id="editDock">
+      <div id="fontStrip" class="strip"></div>
+      <div id="dotStrip" class="strip dots"></div>
+    </div>
+    <textarea id="inlineInput" spellcheck="false" aria-label="Edit text"></textarea>
+
+    <div id="eyeLayer" hidden></div>
+    <div id="loupe" hidden><span></span></div>
+    <div id="dropHint" hidden><span>Drop to open</span></div>
+  </div>
+
+  <div id="videobar" hidden>
+    <div class="vb-row">
+      <button class="iconbtn play" id="playBtn" data-tip="Play or pause (Space)" aria-label="Play"><svg viewBox="0 0 24 24" class="fillicon"><path id="playIcon" d="M7 4l13 8-13 8z"/></svg></button>
+      <span id="timeLabel" class="mono">0:00.0</span>
+      <span id="durLabel" class="mono dim">/ 0:00.0</span>
+      <div class="spacer"></div>
+      <span id="trimLabel" class="mono dim"></span>
+      <button class="btn sm" id="setIn" data-tip="Trim start at playhead (I)">Set in</button>
+      <button class="btn sm" id="setOut" data-tip="Trim end at playhead (O)">Set out</button>
+      <button class="iconbtn" id="muteBtn" data-tip="Mute (M)" aria-label="Mute"><svg viewBox="0 0 24 24"><path d="M11 5L6 9H3v6h3l5 4z"/><path id="muteWave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg></button>
+    </div>
+    <div id="timeline">
+      <canvas id="thumbStrip"></canvas>
+      <div id="dimL" class="tdim"></div><div id="dimR" class="tdim"></div>
+      <div id="trimBox"><span id="hIn" class="handle"></span><span id="hOut" class="handle"></span></div>
+      <div id="playhead"></div>
+    </div>
+    <div id="ruler"></div>
+  </div>
+</main>
+
+<aside id="inspector">
+  <section class="panel" data-panel="select">
+    <h2>Select</h2>
+    <p class="hint">Click an object to move, scale or rotate it. Double click text to edit it.</p>
+    <ul class="keys">
+      <li><kbd>Del</kbd> Remove</li><li><kbd>Ctrl D</kbd> Duplicate</li><li><kbd>Arrows</kbd> Nudge</li><li><kbd>Ctrl Z</kbd> Undo</li>
+    </ul>
+  </section>
+
+  <section class="panel" data-panel="text">
+    <div class="panel-head"><h2>Text</h2><button class="btn primary sm" id="addText" data-tip="Add text">Add text</button></div>
+    <div id="textControls">
+      <textarea id="textInput" rows="3" placeholder="Type or paste text here" spellcheck="false"></textarea>
+      <div class="presets" id="presets"></div>
+      <h3>Animation</h3>
+      <div class="chips" id="animChips"></div>
+      <h3>Font</h3>
+      <div class="chips" id="fontChips">
+        <button data-f="all" class="on">All</button><button data-f="en">English</button><button data-f="mr">Marathi</button><button data-f="cal">Calligraphy</button><button data-f="imp">Imported</button>
+      </div>
+      <input type="search" id="fontSearch" placeholder="Search fonts">
+      <div class="row import-row">
+        <button class="btn sm" id="importFonts" data-tip="Add .ttf, .otf or .woff files"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Import fonts</button>
+        <button class="btn sm" id="importFolder" data-tip="Add every font in a folder"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Import folder</button>
+      </div>
+      <div id="fontGrid" class="font-grid"></div>
+      <p id="legacyHint" class="hint warn" hidden>This font only has Marathi letters</p>
+      <label id="legacyRow" class="check" hidden><input type="checkbox" id="legacyToggle"> Old Marathi font (non-Unicode)</label>
+      <h3>Style</h3>
+      <div class="row"><span class="lbl">Align</span>
+        <div class="seg" id="alignSeg"><button data-v="left">Left</button><button data-v="center">Center</button><button data-v="right">Right</button></div>
+      </div>
+      <label class="slider"><span>Size</span><input type="range" id="fontSize" min="8" max="400" step="1"></label>
+      <label class="slider"><span>Line height</span><input type="range" id="lineHeight" min="0.7" max="2.2" step="0.02"></label>
+      <label class="slider" id="spacingRow"><span>Letter spacing</span><input type="range" id="spacing" min="-100" max="800" step="10"></label>
+      <div class="row"><span class="lbl">Background</span><button class="btn sm" id="bgModeBtn">None</button></div>
+      <div class="row"><span class="lbl">Effect</span>
+        <div class="seg" id="effectSeg"><button data-v="none">None</button><button data-v="shadow">Shadow</button><button data-v="neon">Neon</button></div>
+      </div>
+      <label class="slider"><span>Outline</span><input type="range" id="outline" min="0" max="15" step="0.5"></label>
+      <h3>Colour</h3>
+      <div class="seg wide" id="colorTarget"><button data-v="text" class="on">Text colour</button><button data-v="bg">Background</button><button data-v="outline">Outline</button></div>
+      <div id="textColorSlot"></div>
+      <div id="timeRow" hidden>
+        <h3>Show on video</h3>
+        <div class="row"><label class="num">From <input type="number" id="tStart" step="0.1" min="0" placeholder="start"></label><button class="btn sm" id="tStartNow">Playhead</button></div>
+        <div class="row"><label class="num">To <input type="number" id="tEnd" step="0.1" min="0" placeholder="end"></label><button class="btn sm" id="tEndNow">Playhead</button></div>
+        <button class="btn sm ghost" id="tClear">Show for whole video</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" data-panel="draw">
+    <h2>Draw</h2>
+    <div class="seg wide" id="brushMode"><button data-v="pen" class="on">Pen</button><button data-v="marker">Marker</button><button data-v="neon">Neon</button><button data-v="arrow">Arrow</button></div>
+    <label class="slider"><span>Size</span><input type="range" id="brushSize" min="1" max="60" step="1" value="8"></label>
+    <button class="btn sm" id="fillBtn" data-tip="Cover the picture with the brush colour">Fill with colour</button>
+    <h3>Colour</h3>
+    <div id="drawColorSlot"></div>
+  </section>
+
+  <section class="panel" data-panel="stickers">
+    <div class="panel-head"><h2>Stickers</h2><button class="btn sm" id="photoBtn" data-tip="Add a photo sticker (or paste with Ctrl+V)">Add photo</button></div>
+    <input type="file" id="photoInput" accept="image/*" hidden>
+    <div id="stickerGrid" class="sticker-grid"></div>
+  </section>
+
+  <section class="panel" data-panel="adjust">
+    <div class="panel-head"><h2>Filters</h2><button class="btn sm" id="compareBtn" data-tip="Hold to see the original">Hold to compare</button></div>
+    <div class="filter-grid" id="filterPresets"></div>
+    <h3>Adjust</h3>
+    <div id="adjustSliders"></div>
+    <button class="btn sm ghost" id="adjustReset">Reset</button>
+  </section>
+
+  <section class="panel" data-panel="layers">
+    <h2>Layers</h2>
+    <div id="layerList"></div>
+  </section>
+
+  <div id="colorPanel">
+    <div class="swatches" id="swatches"></div>
+    <div class="row color-tools">
+      <input type="color" id="customColor" value="#ffffff" aria-label="Custom colour">
+      <button class="iconbtn" id="eyedropper" data-tip="Pick a colour from the picture" aria-label="Eyedropper"><svg viewBox="0 0 24 24"><path d="M2 22l1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="M15 6l3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3z"/></svg></button>
+      <span class="lbl">Recent</span>
+      <div class="swatches small" id="recentColors"></div>
+    </div>
+  </div>
+</aside>
+
+<div id="toast" hidden></div>
+<input type="file" id="fileInput" accept="image/*,video/*" hidden>
+<input type="file" id="locateInput" accept="video/*" hidden>
+<div id="dialog" hidden><div class="dlg" role="dialog" aria-modal="true"><p id="dlgText"></p><div class="dlg-actions"><button class="btn" id="dlgCancel">Cancel</button><button class="btn primary" id="dlgOk">OK</button></div></div></div>
+
+<script src="../node_modules/fabric/dist/index.min.js"></script>
+<script src="legacy-marathi.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
