@@ -27,7 +27,7 @@
   </div>
   <input type="file" id="musicInput" accept="audio/*" hidden>
   <div id="progress" hidden><div id="progressFill"></div><span id="progressText">Exporting</span></div>
-  <select id="exportFormat" aria-label="Image format"><option value="png">PNG</option><option value="jpeg">JPG</option><option value="mp4">Video (MP4)</option></select>
+  <select id="exportFormat" aria-label="Export format"><option value="jpeg">JPG, original quality</option><option value="jpeg-max">JPG, maximum quality</option><option value="png">PNG, lossless</option><option value="mp4">Video (MP4)</option></select>
   <select id="stillDur" aria-label="Video length" hidden><option value="5">5 s</option><option value="10">10 s</option><option value="15">15 s</option></select>
   <button class="btn primary" id="exportBtn" data-tip="Export (Ctrl+E)"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>Export</button>
 </header>
@@ -209,6 +209,7 @@
 
 <script src="../node_modules/fabric/dist/index.min.js"></script>
 <script src="legacy-marathi.js"></script>
+<script src="jpeg-info.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

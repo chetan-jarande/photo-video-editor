@@ -62,8 +62,21 @@ Ubuntu 24.04 and newer block the user namespaces Chromium's default sandbox need
 - Add music to any MP4 export.
 
 **Export**
-- Photo: PNG or JPG at full resolution, or an MP4 (5, 10 or 15 s) with animations and music.
+- Photo, at full resolution:
+  - **JPG, original quality** (default for JPEG photos): reads the original's JPEG quality and saves at the same level, so the file stays within about 10% of the original size.
+  - **JPG, maximum quality**: quality 95. Larger than the original when the original was compressed (Telegram and WhatsApp photos are around quality 70).
+  - **PNG, lossless** (default for PNG images and blank stories): 5 to 11 times larger than a JPEG for photos.
+  - **Video (MP4)**: 5, 10 or 15 s with animations and music.
 - Video: MP4 (H.264 + AAC) at the source resolution.
+
+## Projects
+
+Every photo, video or blank story you open becomes a project that saves automatically as you edit (the top bar shows "Saved"). Exporting does not end it: click **Projects** to go home, then open any card under **Your projects** to keep editing. Text, fonts, colours, animations, stickers, filters, trim, mute and music all come back as you left them.
+
+- Photos are copied into the project, so moving or deleting the original does not matter.
+- Videos are linked, not copied. If a video was moved, the app asks you to locate it.
+- Cards have Rename, Duplicate and Delete. Delete moves the project to the system Trash.
+- Projects live in `~/.config/story-editor/projects/`, one folder each.
 
 ## Fonts
 
@@ -91,6 +104,7 @@ Known gaps:
 | V, T, D, S, A, L | Select, Text, Draw, Stickers, Adjust, Layers |
 | Ctrl+O / Ctrl+E | Open / Export |
 | Ctrl+Z / Ctrl+Shift+Z or Ctrl+Y | Undo / Redo |
+| Ctrl+S | Save the project now (it also saves automatically) |
 | Ctrl+D | Duplicate |
 | Delete | Remove selection |
 | Arrows (Shift for 10 px) | Nudge |
@@ -107,10 +121,12 @@ Known gaps:
 main.js                Electron main process: fonts, file dialogs, export
 preload.js             The window.api bridge used by the UI
 export.js              ffmpeg command builder for MP4 export
+projects.js            Project storage: save, load, list, duplicate
 src/index.html         UI markup
 src/styles.css         UI styles
 src/app.js             Editor (Fabric.js canvas, text, colours, animations, video)
 src/legacy-marathi.js  Unicode Marathi to old font converter
+src/jpeg-info.js       Reads a JPEG's size, quality and chroma sampling
 fonts/manifest.json    Bundled font list (family, file, language, style, legacy type)
 fonts/google/          Open licensed Google Fonts
 fonts/legacy/          Old Marathi fonts (AMS, DG, Infinity)
