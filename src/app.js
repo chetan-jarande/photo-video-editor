@@ -251,13 +251,14 @@ function resetStage() {
   canvas.discardActiveObject();
   canvas.remove(...canvas.getObjects());
   canvas.backgroundColor = '';
-  Object.assign(S, { bg: null, video: null, url: '', path: '', type: '', adjust: { ...ZERO }, history: [], hi: -1 });
+  Object.assign(S, { bg: null, video: null, url: '', path: '', type: '', src: null, adjust: { ...ZERO }, history: [], hi: -1 });
 }
 function startStory(type, w, h) {
   S.type = type; S.W = w; S.H = h;
   document.body.classList.add('has-media');
   $('#videobar').hidden = type !== 'video';
   $('#exportFormat').hidden = type === 'video';
+  $('#exportFormat').value = type === 'image' && S.src?.type !== 'image/png' ? 'jpeg' : 'png';
   syncExportUI();
   fit(); commit(); syncAll();
 }
@@ -289,8 +290,10 @@ async function loadMedia(file, path) {
     toast(e.message || 'Could not open this file');
     return false;
   }
+  const quality = type === 'image' && /jpe?g/.test(file.type) ? window.JpegInfo?.jpegInfo(await file.arrayBuffer())?.quality ?? null : null;
   resetStage();
   S.url = url;
+  if (type === 'image') S.src = { type: file.type, size: file.size, quality };
   S.path = path ?? (API.pathForFile ? API.pathForFile(file) : '');
   const w = type === 'image' ? el.naturalWidth : el.videoWidth, h = type === 'image' ? el.naturalHeight : el.videoHeight;
   S.bg = new fabric.FabricImage(el, { left: w / 2, top: h / 2, selectable: false, evented: false, isBackground: true, objectCaching: false, hoverCursor: 'default' });
@@ -934,10 +937,24 @@ function nudge(dx, dy) {
 }
 
 // ---------- export ----------
-function renderPng(filter, format = 'png') {
+function renderPng(filter, format = 'png', quality = 0.95) {
   const z = canvas.getZoom();
   // +0.5 so the canvas size truncates to exactly the native size despite float error
-  return canvas.toDataURL({ format, quality: 0.95, multiplier: 1 / z, width: (S.W + 0.5) * z, height: (S.H + 0.5) * z, filter });
+  return canvas.toDataURL({ format, quality, multiplier: 1 / z, width: (S.W + 0.5) * z, height: (S.H + 0.5) * z, filter });
+}
+const dataUrlBytes = (u) => Math.round(((u.length - u.indexOf(',') - 1) * 3) / 4);
+const fmtBytes = (n) => (n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+// match the source JPEG's quality, then step down (at most 0.1) until within 10% of its file size
+function encodeStill(fmt) {
+  const keep = (o) => !o.hidden;
+  if (fmt === 'png') return renderPng(keep, 'png');
+  if (fmt === 'jpeg-max') return renderPng(keep, 'jpeg', 0.95);
+  if (!S.src) return renderPng(keep, 'jpeg', 0.9);
+  let q = Math.min(0.95, Math.max(0.6, (S.src.quality || 90) / 100));
+  const floor = q - 0.1, limit = S.src.size * 1.1;
+  let url = renderPng(keep, 'jpeg', q);
+  while (dataUrlBytes(url) > limit && q - 0.03 >= floor) { q -= 0.03; url = renderPng(keep, 'jpeg', q); }
+  return url;
 }
 function buildOverlays() {
   const live = userObjects().filter((o) => !o.hidden);
@@ -969,11 +986,11 @@ async function exportStory() {
   const fmtSel = $('#exportFormat').value, still = S.type !== 'video';
   if (still && fmtSel !== 'mp4') {
     S.exportT = Infinity;
-    const url = renderPng((o) => !o.hidden, fmtSel);
+    const url = encodeStill(fmtSel);
     S.exportT = null;
     try {
-      const p = await API.saveImage(url, `story.${fmtSel === 'jpeg' ? 'jpg' : 'png'}`);
-      if (p) toast(`Saved to ${p}`, 6000);
+      const p = await API.saveImage(url, `story.${fmtSel === 'png' ? 'png' : 'jpg'}`);
+      if (p) toast(`Saved ${fmtBytes(dataUrlBytes(url))}${S.src ? ` (original ${fmtBytes(S.src.size)})` : ''} to ${p}`, 7000);
     } catch (e) { toast('Export failed: ' + e.message, 8000); }
     return;
   }
@@ -1271,7 +1288,7 @@ function markDirty() {
 }
 function projectState() {
   return {
-    v: 1, W: S.W, H: S.H, type: S.type, objects: JSON.parse(snap()),
+    v: 2, W: S.W, H: S.H, type: S.type, objects: JSON.parse(snap()),
     adjust: { ...S.adjust }, filterName: S.filterName,
     trimIn: S.trimIn, trimOut: S.trimOut, muted: !!S.video?.muted, music: S.music,
     bgColor: S.type === 'blank' ? canvas.backgroundColor : null,
@@ -1376,7 +1393,7 @@ async function openProject(id) {
       S.video.muted = !!st.muted; S.video.currentTime = S.trimIn; syncVideoUI();
     }
     S.music = st.music || null; syncMusic();
-    if (st.exportFormat) $('#exportFormat').value = st.exportFormat;
+    if (st.exportFormat && !(st.v < 2 && st.exportFormat === 'png')) $('#exportFormat').value = st.exportFormat;
     if (st.stillDur) $('#stillDur').value = st.stillDur;
     syncExportUI();
     const objs = await fabric.util.enlivenObjects(st.objects || []);
@@ -1464,4 +1481,4 @@ const fontsReady = API.listFonts ? API.listFonts().then((l) => addFonts(l)).catc
 
 // test hook for smoke runs
 refreshProjects();
-window.__editor = { S, canvas, openFile, startBlank, openProject, goHome, saveNow, projectState, refreshProjects, addText, addSticker, setTool, applyPreset, exportStory, importFontPaths, enterEdit, exitEdit };
+window.__editor = { S, canvas, encodeStill, openFile, startBlank, openProject, goHome, saveNow, projectState, refreshProjects, addText, addSticker, setTool, applyPreset, exportStory, importFontPaths, enterEdit, exitEdit };
