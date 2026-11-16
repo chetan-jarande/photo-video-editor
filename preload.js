@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('api', {
   importFonts: () => ipcRenderer.invoke('fonts:import'),
   importFontFolder: () => ipcRenderer.invoke('fonts:importFolder'),
   importFontPaths: (paths) => ipcRenderer.invoke('fonts:importPaths', paths),
+  removeFont: (file) => ipcRenderer.invoke('fonts:remove', file),
   pathForFile: (file) => webUtils.getPathForFile(file),
   saveImage: (dataUrl, defaultName) => ipcRenderer.invoke('image:save', dataUrl, defaultName),
   exportVideo: (job) => ipcRenderer.invoke('video:export', job),

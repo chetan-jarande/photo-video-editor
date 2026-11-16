@@ -14,7 +14,7 @@ const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = se
 const fmt = (s) => { s = Math.max(0, s || 0); const m = Math.floor(s / 60); return `${m}:${(s - m * 60).toFixed(1).padStart(4, '0')}`; };
 
 // ---------- fabric setup ----------
-fabric.FabricObject.customProperties = ['anim', 'textStyle', 'kind', 'sourceText', 'fontId', 'color', 'bgMode', 'bgColor', 'effect', 'caps', 'spacing', 'tStart', 'tEnd', 'isBackground', 'hidden', 'locked'];
+fabric.FabricObject.customProperties = ['anim', 'textStyle', 'kind', 'sourceText', 'fontId', 'fontLabel', 'color', 'bgMode', 'bgColor', 'effect', 'caps', 'spacing', 'tStart', 'tEnd', 'isBackground', 'hidden', 'locked'];
 Object.assign(fabric.InteractiveFabricObject.ownDefaults, {
   cornerStyle: 'circle', cornerColor: '#ffffff', cornerStrokeColor: '#2f81f7', transparentCorners: false,
   cornerSize: 13, borderColor: 'rgba(255,255,255,0.9)', borderScaleFactor: 1.5, padding: 10,
@@ -63,7 +63,9 @@ function toast(msg, ms = 3500) {
   t.textContent = msg; t.hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, ms);
 }
-const legacyOf = (f) => (f ? S.legacyMap[f.id] ?? f.legacy ?? null : null);
+const fontOf = (id) => (window.FontUtils?.findFont ? window.FontUtils.findFont(S.fontById, S.fonts, id) : S.fontById.get(id) || null);
+const legacyOf = (f) => (window.FontUtils ? window.FontUtils.legacyOf(f, S.legacyMap) : (f ? S.legacyMap[f.id] ?? f.legacy ?? null : null));
+const weightBounds = (f) => window.FontUtils?.weightBounds?.(f) ?? null;
 const isMr = (f) => !!legacyOf(f) || (f.lang || []).includes('mr');
 const activeObj = () => canvas.getActiveObject();
 const activeText = () => { const o = activeObj(); return o && o.kind === 'text' ? o : null; };
@@ -78,7 +80,8 @@ function render() { canvas.requestRenderAll(); }
 // derive everything fabric draws from the text object's own custom props
 function restyle(o) {
   if (o.kind !== 'text') { o.objectCaching = false; return; }
-  const f = S.fontById.get(o.fontId);
+  const f = fontOf(o.fontId);
+  if (f) { o.fontId = f.id; o.fontLabel = f.label; }
   const leg = legacyOf(f);
   const t = o.sourceText || '';
   const color = o.color || '#ffffff';
@@ -98,7 +101,7 @@ function restyle(o) {
   o.setCoords();
 }
 function displayFor(o, s) {
-  const leg = legacyOf(S.fontById.get(o.fontId));
+  const leg = legacyOf(fontOf(o.fontId));
   if (o.caps && !leg) s = s.toUpperCase();
   s = wrapLines(o, s, leg);
   return leg ? toLegacy(s, leg) : s;
@@ -106,20 +109,20 @@ function displayFor(o, s) {
 const measureCtx = document.createElement('canvas').getContext('2d');
 function wrapLines(o, s, leg) {
   if (!S.W) return s;
-  const f = S.fontById.get(o.fontId);
-  const max = (S.W * 0.9) / (o.scaleX || 1);
+  const f = fontOf(o.fontId);
   measureCtx.font = `${o.fontStyle || 'normal'} ${o.fontWeight || 'normal'} ${o.fontSize}px "${f ? f.family : 'sans-serif'}"`;
-  const width = (x) => measureCtx.measureText(leg ? toLegacy(x, leg) : x).width;
-  return s.split('\n').map((line) => {
-    const out = [];
-    let cur = '';
-    for (const word of line.split(' ')) {
-      const next = cur ? `${cur} ${word}` : word;
-      if (cur && width(next) > max) { out.push(cur); cur = word; } else cur = next;
-    }
-    out.push(cur);
-    return out.join('\n');
-  }).join('\n');
+  return window.FontUtils.wrapTextLines(s, {
+    stageW: S.W,
+    scaleX: o.scaleX || 1,
+    fontSize: o.fontSize,
+    spacing: o.spacing || 0,
+    strokeWidth: o.strokeWidth || 0,
+    bgMode: o.bgMode || 'none',
+    legacy: leg,
+    hasDevanagari: hasDeva(s),
+    toDisplay: (x) => (leg ? toLegacy(x, leg) : x),
+    measure: (t) => measureCtx.measureText(t).width,
+  });
 }
 
 // ---------- text animations ----------
@@ -484,7 +487,7 @@ function fontPreview(f) {
 }
 function fontMatches(f) {
   const q = S.fontQuery.trim().toLowerCase();
-  if (q && !`${f.label} ${f.family}`.toLowerCase().includes(q)) return false;
+  if (q && !`${f.label} ${f.family} ${f.file || ''}`.toLowerCase().includes(q)) return false;
   switch (S.fontFilter) {
     case 'en': return !legacyOf(f) && (f.lang || []).includes('en');
     case 'mr': return isMr(f);
@@ -502,6 +505,12 @@ function renderFontGrid() {
     const pv = document.createElement('span'); pv.className = 'pv'; pv.textContent = fontPreview(f); pv.style.fontFamily = `"${f.family}"`;
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = f.label + (f.source === 'imported' ? ' (imported)' : '');
     b.append(pv, nm);
+    if (f.source === 'imported') {
+      const del = document.createElement('span');
+      del.className = 'font-del'; del.dataset.del = f.id; del.title = 'Remove imported font'; del.setAttribute('role', 'button'); del.setAttribute('aria-label', `Remove ${f.label}`);
+      del.textContent = '×';
+      b.append(del);
+    }
     return b;
   }));
   if (!list.length) grid.innerHTML = `<div class="empty">${S.fonts.length ? 'No fonts match.' : 'Loading fonts...'}</div>`;
@@ -531,7 +540,7 @@ function detectDevanagari(f) {
 async function loadFontFace(f) {
   try {
     const buf = await API.readFont(f.file);
-    const face = new FontFace(f.family, buf);
+    const face = new FontFace(f.family, buf, f.weight ? { weight: f.weight } : undefined);
     await face.load();
     document.fonts.add(face);
     fabric.cache.clearFontCache(f.family);
@@ -835,15 +844,33 @@ function setTool(t) {
   syncInspector();
 }
 function syncTextHints(o) {
-  const f = S.fontById.get(o?.fontId ?? S.defaultFontId);
+  const resolved = o?.fontId ? fontOf(o.fontId) : null;
+  const missing = !!(o?.fontId && !resolved);
+  $('#missingFontHint').hidden = !missing;
+  if (missing) $('#missingFontHint').textContent = `Missing font "${o.fontLabel || o.fontId}". Import it or pick another font.`;
+  const f = resolved ?? S.fontById.get(S.defaultFontId);
   const leg = legacyOf(f);
   $('#legacyHint').hidden = !(leg && /[A-Za-z]/.test(o?.sourceText || ''));
   $('#legacyRow').hidden = !(f && f.source === 'imported');
-  $('#legacyToggle').checked = !!leg;
+  $('#legacySelect').value = leg || 'none';
   const noSpacing = o && !leg && hasDeva(o.sourceText || '');
   $('#spacing').disabled = !!noSpacing;
   $('#spacingRow').classList.toggle('disabled', !!noSpacing);
   $('#spacingRow').title = noSpacing ? 'Letter spacing breaks Marathi letters in Unicode fonts' : '';
+  const numW = Number(o?.fontWeight);
+  const isBold = o?.fontWeight === 'bold' || (Number.isFinite(numW) && numW >= 600);
+  $$('#formatSeg button').forEach((b) => {
+    const v = b.dataset.v;
+    b.classList.toggle('on', v === 'bold' ? isBold : v === 'italic' ? o?.fontStyle === 'italic' : !!(o?.caps && !leg));
+    if (v === 'caps') b.disabled = !!leg;
+  });
+  const wb = weightBounds(f);
+  $('#weightRow').hidden = !wb;
+  if (wb) {
+    const fw = $('#fontWeight');
+    fw.min = wb[0]; fw.max = wb[1];
+    fw.value = o ? (Number.isFinite(numW) ? Math.min(wb[1], Math.max(wb[0], numW)) : (isBold ? Math.min(wb[1], 700) : Math.min(wb[1], Math.max(wb[0], 400)))) : Math.min(wb[1], Math.max(wb[0], 400));
+  }
 }
 function setSeg(sel, v) { $$(`${sel} button`).forEach((b) => b.classList.toggle('on', b.dataset.v === v)); }
 function syncInspector() {
@@ -1062,6 +1089,20 @@ $('#textInput').addEventListener('input', (e) => {
   editText((o) => { o.sourceText = e.target.value; });
 });
 $('#fontSize').addEventListener('input', (e) => editText((o) => { o.fontSize = +e.target.value; }));
+$('#fontWeight').addEventListener('input', (e) => editText((o) => { o.fontWeight = +e.target.value; o.textStyle = null; }));
+$('#formatSeg').onclick = (e) => {
+  const v = e.target.closest('button')?.dataset.v;
+  if (!v) return;
+  editText((o) => {
+    o.textStyle = null;
+    if (v === 'bold') {
+      const numW = Number(o.fontWeight), isBold = o.fontWeight === 'bold' || (Number.isFinite(numW) && numW >= 600);
+      const wb = weightBounds(S.fontById.get(o.fontId));
+      o.fontWeight = wb ? Math.min(wb[1], Math.max(wb[0], isBold ? 400 : 700)) : (isBold ? 'normal' : 'bold');
+    } else if (v === 'italic') o.fontStyle = o.fontStyle === 'italic' ? 'normal' : 'italic';
+    else if (v === 'caps') o.caps = !o.caps;
+  });
+};
 $('#lineHeight').addEventListener('input', (e) => editText((o) => { o.lineHeight = +e.target.value; }));
 $('#spacing').addEventListener('input', (e) => editText((o) => { o.spacing = +e.target.value; }));
 $('#outline').addEventListener('input', (e) => editText((o) => {
@@ -1121,10 +1162,31 @@ $('#fontSearch').addEventListener('input', (e) => { S.fontQuery = e.target.value
 function pickFontId(id) {
   S.defaultFontId = id;
   const o = activeText();
-  if (o) { o.fontId = id; o.textStyle = null; restyle(o); render(); commit(); }
+  if (o) { o.fontId = id; o.fontLabel = S.fontById.get(id)?.label || null; o.textStyle = null; restyle(o); render(); commit(); }
   syncInspector();
 }
-$('#fontGrid').onclick = (e) => { const id = e.target.closest('.font-card')?.dataset.id; if (id) pickFontId(id); };
+async function removeImportedFont(id, skipConfirm) {
+  const f = S.fontById.get(id);
+  if (!f || f.source !== 'imported' || !API.removeFont) return;
+  if (!skipConfirm && !(await ask(`Remove imported font "${f.label}"?`, 'Remove', 'Cancel'))) return;
+  try {
+    await API.removeFont(f.file);
+    S.fonts = S.fonts.filter((x) => x.id !== id);
+    S.fontById.delete(id);
+    delete S.legacyMap[id];
+    store.set('legacyFonts', S.legacyMap);
+    if (S.defaultFontId === id) S.defaultFontId = (S.fonts.find((x) => x.style === 'sans' && !legacyOf(x)) || S.fonts[0])?.id || null;
+    userObjects().forEach((o) => { if (o.fontId === id) restyle(o); });
+    render(); renderFontGrid(); renderFontStrip(); syncInspector();
+    toast(`Removed ${f.label}`);
+  } catch (e) { toast(e.message || 'Could not remove font'); }
+}
+$('#fontGrid').onclick = (e) => {
+  const del = e.target.closest('[data-del]')?.dataset.del;
+  if (del) { e.stopPropagation(); removeImportedFont(del); return; }
+  const id = e.target.closest('.font-card')?.dataset.id;
+  if (id) pickFontId(id);
+};
 async function runImport(fn) {
   if (!fn) return toast('Font import is not available');
   try {
@@ -1134,9 +1196,10 @@ async function runImport(fn) {
 }
 $('#importFonts').onclick = () => runImport(API.importFonts);
 $('#importFolder').onclick = () => runImport(API.importFontFolder);
-$('#legacyToggle').onchange = (e) => {
+$('#legacySelect').onchange = (e) => {
   const f = S.fontById.get(activeText()?.fontId ?? S.defaultFontId); if (!f) return;
-  if (e.target.checked) S.legacyMap[f.id] = 'ams'; else delete S.legacyMap[f.id];
+  const v = e.target.value;
+  if (v === (f.legacy || 'none')) delete S.legacyMap[f.id]; else S.legacyMap[f.id] = v;
   store.set('legacyFonts', S.legacyMap);
   userObjects().forEach((o) => { if (o.fontId === f.id) restyle(o); });
   render(); renderFontGrid(); renderFontStrip(); syncInspector();
@@ -1398,6 +1461,8 @@ async function openProject(id) {
     syncExportUI();
     const objs = await fabric.util.enlivenObjects(st.objects || []);
     objs.forEach((o) => { restyle(o); applyFlags(o); canvas.add(o); });
+    const missingFonts = [...new Set(objs.filter((o) => o.kind === 'text' && o.fontId && !S.fontById.has(o.fontId)).map((o) => o.fontLabel || o.fontId))];
+    if (missingFonts.length) toast(`Missing font${missingFonts.length > 1 ? 's' : ''}: ${missingFonts.join(', ')}`, 6000);
     S.history = []; S.hi = -1; commit();
     S.project = { id: p.id, name: p.name };
   } finally { S.loading = false; }
@@ -1481,4 +1546,4 @@ const fontsReady = API.listFonts ? API.listFonts().then((l) => addFonts(l)).catc
 
 // test hook for smoke runs
 refreshProjects();
-window.__editor = { S, canvas, encodeStill, openFile, startBlank, openProject, goHome, saveNow, projectState, refreshProjects, addText, addSticker, setTool, applyPreset, exportStory, importFontPaths, enterEdit, exitEdit };
+window.__editor = { S, canvas, encodeStill, openFile, startBlank, openProject, goHome, saveNow, projectState, refreshProjects, addText, addSticker, setTool, applyPreset, exportStory, importFontPaths, removeImportedFont, enterEdit, exitEdit };

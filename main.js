@@ -4,12 +4,13 @@ const os = require('os');
 const fs = require('fs/promises');
 const { buildFfmpegArgs, runFfmpeg } = require('./export');
 const projects = require('./projects');
+const fonts = require('./fonts');
 
 const ROOT = __dirname;
 const BUNDLED_FONTS = path.join(ROOT, 'fonts');
+const CUSTOM_FONTS = process.env.CUSTOM_FONTS_DIR || path.join(ROOT, 'custom-fonts');
 const userFonts = () => path.join(app.getPath('userData'), 'fonts');
 const projectsRoot = () => path.join(app.getPath('userData'), 'projects');
-const FONT_EXT = /\.(ttf|otf|woff2?)$/i;
 const SMOKE = !!process.env.SMOKE;
 
 let win;
@@ -51,78 +52,16 @@ function smoke(w) {
   });
 }
 
-function slug(s) {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
-function importedMeta(file) {
-  const base = file.replace(FONT_EXT, '');
-  const legacy = /^dg/i.test(base) ? 'dg' : /^infinity/i.test(base) ? 'infinity' : /^(ams|shree|kruti|shivaji|akruti)/i.test(base) ? 'ams' : null;
-  return {
-    id: `imported-${slug(base)}`,
-    family: `U ${base.replace(/[^\w ]+/g, ' ').trim()}`,
-    label: base,
-    file: `imported/${file}`,
-    lang: legacy ? ['mr'] : ['en'],
-    style: 'display',
-    legacy,
-    source: 'imported',
-  };
-}
-
-function resolveFont(file) {
-  const [root, rel] = file.startsWith('imported/') ? [userFonts(), file.slice(9)] : [BUNDLED_FONTS, file];
-  const full = path.resolve(root, rel);
-  if (!full.startsWith(root + path.sep) || !FONT_EXT.test(full)) throw new Error(`Bad font path: ${file}`);
-  return full;
-}
-
-async function listFonts() {
-  let bundled = [];
-  try {
-    bundled = JSON.parse(await fs.readFile(path.join(BUNDLED_FONTS, 'manifest.json'), 'utf8'));
-  } catch (err) {
-    console.error('fonts/manifest.json unreadable:', err.message);
-  }
-  const imported = (await fs.readdir(userFonts()).catch(() => [])).filter((f) => FONT_EXT.test(f)).sort();
-  return [...bundled.map((f) => ({ ...f, source: 'bundled' })), ...imported.map(importedMeta)];
-}
-
-async function expandFontPaths(paths) {
-  const out = [];
-  for (const p of paths) {
-    const st = await fs.stat(p).catch(() => null);
-    if (st?.isDirectory()) {
-      const entries = await fs.readdir(p, { recursive: true, withFileTypes: true });
-      for (const d of entries) if (d.isFile() && FONT_EXT.test(d.name)) out.push(path.join(d.parentPath, d.name));
-    } else if (st?.isFile() && FONT_EXT.test(p)) out.push(p);
-  }
-  return out;
-}
-
-async function copyFonts(paths) {
-  await fs.mkdir(userFonts(), { recursive: true });
-  const bundled = new Set((await listFonts()).filter((f) => f.source === 'bundled').map((f) => path.basename(f.file)));
-  const metas = new Map();
-  for (const p of await expandFontPaths(paths)) {
-    const name = path.basename(p);
-    if (bundled.has(name)) continue;
-    await fs.copyFile(p, path.join(userFonts(), name));
-    metas.set(name, importedMeta(name));
-  }
-  return [...metas.values()];
-}
-
-ipcMain.handle('fonts:list', listFonts);
+ipcMain.handle('fonts:list', () => fonts.listFonts(BUNDLED_FONTS, userFonts(), CUSTOM_FONTS));
 
 ipcMain.handle('fonts:read', async (_e, file) => {
-  const buf = await fs.readFile(resolveFont(file));
+  const buf = await fs.readFile(fonts.resolveFont(BUNDLED_FONTS, userFonts(), file));
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 });
 
 ipcMain.handle('fonts:importFolder', async () => {
   const r = await dialog.showOpenDialog(win, { title: 'Import a font folder', properties: ['openDirectory', 'multiSelections'] });
-  return r.canceled ? [] : copyFonts(r.filePaths);
+  return r.canceled ? [] : fonts.copyFonts(BUNDLED_FONTS, userFonts(), r.filePaths);
 });
 
 ipcMain.handle('fonts:import', async () => {
@@ -131,10 +70,11 @@ ipcMain.handle('fonts:import', async () => {
     properties: ['openFile', 'multiSelections'],
     filters: [{ name: 'Fonts', extensions: ['ttf', 'otf', 'woff', 'woff2'] }],
   });
-  return r.canceled ? [] : copyFonts(r.filePaths);
+  return r.canceled ? [] : fonts.copyFonts(BUNDLED_FONTS, userFonts(), r.filePaths);
 });
 
-ipcMain.handle('fonts:importPaths', (_e, paths) => copyFonts(Array.isArray(paths) ? paths : []));
+ipcMain.handle('fonts:importPaths', (_e, paths) => fonts.copyFonts(BUNDLED_FONTS, userFonts(), Array.isArray(paths) ? paths : []));
+ipcMain.handle('fonts:remove', (_e, file) => fonts.removeFont(userFonts(), file));
 
 ipcMain.handle('image:save', async (_e, dataUrl, defaultName) => {
   const m = /^data:image\/(png|jpeg);base64,(.+)$/s.exec(dataUrl || '');

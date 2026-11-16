@@ -63,6 +63,16 @@ test('Devanagari digits map to ASCII digits', () => {
   assert.strictEqual(toLegacy('१२३४५६७८९०'), '1234567890');
 });
 
+test('Marathi eyelash-Ra (ऱ्, र+्+ZWJ, र+़+्) maps to + across ams, dg and infinity', () => {
+  for (const v of ['ams', 'dg', 'infinity']) {
+    assert.strictEqual(toLegacy('वाऱ्यावर', v), 'vaa+yaavar');
+    assert.strictEqual(toLegacy('तऱ्हा', v), 'ta+ha');
+    assert.strictEqual(toLegacy('वा\u0930\u094D\u200Dयावर', v), 'vaa+yaavar');
+    assert.strictEqual(toLegacy('वा\u0930\u093C\u094Dयावर', v), 'vaa+yaavar');
+  }
+  assert.strictEqual(toLegacy('ऱ', 'ams'), 'r');
+});
+
 test('hasDevanagari', () => {
   assert.strictEqual(hasDevanagari('Hello'), false);
   assert.strictEqual(hasDevanagari('Hello नमस्कार'), true);

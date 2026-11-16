@@ -1,7 +1,7 @@
 {
   "name": "story-editor",
   "version": "0.1.0",
-  "private": true,
+  "license": "MIT",
   "description": "Lightweight photo and video story editor with custom fonts",
   "author": "chetan jarande <chetanjarande@gmail.com>",
   "main": "main.js",

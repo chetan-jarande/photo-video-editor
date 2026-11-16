@@ -137,12 +137,25 @@
         <button class="btn sm" id="importFolder" data-tip="Add every font in a folder"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Import folder</button>
       </div>
       <div id="fontGrid" class="font-grid"></div>
+      <p id="missingFontHint" class="hint warn" hidden></p>
       <p id="legacyHint" class="hint warn" hidden>This font only has Marathi letters</p>
-      <label id="legacyRow" class="check" hidden><input type="checkbox" id="legacyToggle"> Old Marathi font (non-Unicode)</label>
+      <div class="row" id="legacyRow" hidden>
+        <span class="lbl">Encoding</span>
+        <select id="legacySelect" aria-label="Font encoding">
+          <option value="none">Unicode (normal)</option>
+          <option value="ams">Old Marathi (AMS / IndiaFont)</option>
+          <option value="dg">Old Marathi (DG)</option>
+          <option value="infinity">Old Marathi (Infinity)</option>
+        </select>
+      </div>
       <h3>Style</h3>
+      <div class="row"><span class="lbl">Format</span>
+        <div class="seg" id="formatSeg"><button data-v="bold" data-tip="Bold"><b>B</b></button><button data-v="italic" data-tip="Italic"><i>I</i></button><button data-v="caps" data-tip="Uppercase">AA</button></div>
+      </div>
       <div class="row"><span class="lbl">Align</span>
         <div class="seg" id="alignSeg"><button data-v="left">Left</button><button data-v="center">Center</button><button data-v="right">Right</button></div>
       </div>
+      <label class="slider" id="weightRow" hidden><span>Weight</span><input type="range" id="fontWeight" min="100" max="900" step="10" value="400"></label>
       <label class="slider"><span>Size</span><input type="range" id="fontSize" min="8" max="400" step="1"></label>
       <label class="slider"><span>Line height</span><input type="range" id="lineHeight" min="0.7" max="2.2" step="0.02"></label>
       <label class="slider" id="spacingRow"><span>Letter spacing</span><input type="range" id="spacing" min="-100" max="800" step="10"></label>
@@ -209,6 +222,7 @@
 
 <script src="../node_modules/fabric/dist/index.min.js"></script>
 <script src="legacy-marathi.js"></script>
+<script src="font-utils.js"></script>
 <script src="jpeg-info.js"></script>
 <script src="app.js"></script>
 </body>

@@ -6,7 +6,7 @@
     'ट': ['o', null, 1], 'ठ': ['O', null, 1], 'ड': ['D', null, 1], 'ढ': ['Z', null, 1], 'ण': ['Na', 'N'],
     'त': ['ta', 't'], 'थ': ['Ta', 'T'], 'द': ['d', null, 1], 'ध': ['Ya', 'Y'], 'न': ['na', 'n'],
     'प': ['pa', 'p'], 'फ': ['f', null], 'ब': ['ba', 'b'], 'भ': ['Ba', 'B'], 'म': ['ma', 'm'],
-    'य': ['ya', 'y'], 'र': ['r', null], 'ऱ': ['r', null], 'ल': ['la', 'l'], 'ळ': ['L', null], 'व': ['va', 'v'],
+    'य': ['ya', 'y'], 'र': ['r', null], 'ऱ': ['r', '+'], 'ल': ['la', 'l'], 'ळ': ['L', null], 'व': ['va', 'v'],
     'श': ['Sa', 'S'], 'ष': ['Va', 'V'], 'स': ['sa', 's'], 'ह': ['h', null, 1],
     'क्ष': ['Ha', 'H'], 'ज्ञ': ['za', 'z'], 'त्र': ['Pa', 'P'], 'श्र': ['Ma', 'M'],
   };
@@ -33,7 +33,7 @@
     const vk = V[variant] ? variant : 'ams';
     const v = V[vk];
     const conj = vk === 'ams' ? CONS : Object.assign({}, CONS, { 'क': ['|a', '|'] }, vk === 'dg' ? DG_CONJ : {});
-    const s = String(text || '').normalize('NFC').replace(/[‌‍़]/g, '');
+    const s = String(text || '').normalize('NFC').replace(/ऱ/g, 'ऱ').replace(/र्\u200D/g, 'ऱ्').replace(/[‌‍़]/g, '');
     let out = '';
     let i = 0;
     while (i < s.length) {

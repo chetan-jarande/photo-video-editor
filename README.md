@@ -40,10 +40,10 @@ Ubuntu 24.04 and newer block the user namespaces Chromium's default sandbox need
 ## Features
 
 **Text**
-- Type or paste text, then click any font to apply it. 63 fonts are bundled: 18 old Marathi fonts (AMS, DG, Infinity), Unicode Marathi fonts (Yatra One, Kalam, Amita, Rozha One, Tiro Devanagari Marathi and more) and English script, calligraphy and display fonts.
+- Type or paste text, then click any font to apply it. 45 open-licensed fonts are bundled: Unicode Marathi fonts (Yatra One, Kalam, Amita, Rozha One, Tiro Devanagari Marathi and more) and English script, calligraphy and display fonts. Local or user-supplied fonts (including old non-Unicode Marathi AMS, DG and Infinity fonts) can be placed in `custom-fonts/` or imported in the UI.
 - Instagram style presets: Classic, Modern, Neon, Typewriter, Strong, Elegant, Literature, Directional, Meme, Signature, Editor, Bubble, Deco, Poster, Squeeze, Journal. With Marathi text each preset picks a Marathi capable font.
 - Animations: Typewriter, Fade, Rise, Pop, Bounce, Glow pulse, Shimmer, Sway. They play in the preview and are kept in MP4 exports.
-- Background box (solid or translucent), shadow, neon glow, outline, alignment, size, line height, letter spacing.
+- Background box (solid or translucent), shadow, neon glow, outline, alignment, bold/italic/uppercase, variable font weight, size, line height, letter spacing.
 - Long text wraps to fit the frame.
 
 **Colour**
@@ -81,21 +81,23 @@ Every photo, video or blank story you open becomes a project that saves automati
 ## Fonts
 
 ### Importing fonts
-In the Text panel use **Import fonts** (files) or **Import folder** (every `.ttf`, `.otf`, `.woff`, `.woff2` inside, subfolders included). You can also drag font files or folders onto the window. Imported fonts are copied to `~/.config/story-editor/fonts/` and appear under the **Imported** tab.
+In the Text panel use **Import fonts** (files) or **Import folder** (every `.ttf`, `.otf`, `.woff`, `.woff2` inside, subfolders included). You can also drag font files or folders onto the window, or drop them into a gitignored `custom-fonts/` directory (subfolders included) in the project root so they are imported automatically on startup. Imported fonts are stored in `~/.config/story-editor/fonts/` and appear under the **Imported** tab.
 
 ### Old Marathi fonts
-Fonts such as AMS, DG and Infinity are not Unicode fonts: they draw Marathi letters in place of English keyboard characters. The editor stores what you typed and converts it for these fonts automatically (`src/legacy-marathi.js`), so you can paste normal Marathi text and just click the font.
+Fonts such as AMS (IndiaFont), DG and Infinity are not Unicode fonts: they draw Marathi letters in place of English keyboard characters. The editor stores what you typed and converts it for these fonts automatically (`src/legacy-marathi.js`), so you can paste normal Marathi text and just click the font.
 
-Imported fonts whose file names start with AMS, DG, Infinity, Shree, Kruti, Shivaji or Akruti are detected as old Marathi fonts. For any other one, tick **Old Marathi font (non-Unicode)** when it is selected.
+Imported AMS / IndiaFont, DG and Infinity fonts are detected automatically from their file names and OpenType metadata. For any other imported font, pick **Unicode**, **Old Marathi (AMS / IndiaFont)**, **Old Marathi (DG)** or **Old Marathi (Infinity)** in the **Encoding** menu when it is selected.
 
 Known gaps:
 - AMS Lekhan 1 draws ऊ incorrectly.
 - DGFont-025 draws ठ्ठ and रू incorrectly.
 - AMS and Infinity fonts have no stacked conjuncts, so letters such as ठ्ठ and द्ध are shown with a halant.
+- Other legacy encodings (such as Kruti Dev, Shree-Lipi, Shivaji or Akruti) use different character maps and are not converted automatically.
 
 ### Licences
-- `fonts/google/` fonts are under the SIL Open Font License (texts in `fonts/google/licenses/`).
-- The AMS and DG fonts in `fonts/legacy/` are not open licensed. The DG licences say members only, not for sharing or corporate use. Check before any commercial use. See `fonts/README.md`.
+- Story Editor source code is released under the MIT License (see `LICENSE`).
+- `fonts/google/` fonts are under the SIL Open Font License 1.1 (texts in `fonts/google/licenses/`).
+- Proprietary or personal-use fonts should not be committed to `fonts/`; keep them locally in `custom-fonts/` (gitignored) or import them via the UI. See `fonts/README.md`.
 
 ## Keyboard shortcuts
 
@@ -120,20 +122,22 @@ Known gaps:
 ```
 main.js                Electron main process: fonts, file dialogs, export
 preload.js             The window.api bridge used by the UI
+fonts.js               OpenType metadata reader, font listing and import
 export.js              ffmpeg command builder for MP4 export
 projects.js            Project storage: save, load, list, duplicate
 src/index.html         UI markup
 src/styles.css         UI styles
 src/app.js             Editor (Fabric.js canvas, text, colours, animations, video)
+src/font-utils.js      Line wrapping, variable weight and legacy font helpers
 src/legacy-marathi.js  Unicode Marathi to old font converter
 src/jpeg-info.js       Reads a JPEG's size, quality and chroma sampling
 fonts/manifest.json    Bundled font list (family, file, language, style, legacy type)
-fonts/google/          Open licensed Google Fonts
-fonts/legacy/          Old Marathi fonts (AMS, DG, Infinity)
+fonts/google/          Open licensed Google Fonts (SIL OFL 1.1)
+custom-fonts/          Optional gitignored local fonts auto-imported on startup
 test/                  node:test suites
 ```
 
-To add a bundled font, put the file in `fonts/google/` (or `fonts/legacy/`) and add an entry to `fonts/manifest.json`. Set `legacy` to `"ams"`, `"dg"` or `"infinity"` for old Marathi fonts, or `null` for Unicode fonts.
+To add a bundled open-licensed font, put the file in `fonts/google/` (with its licence in `fonts/google/licenses/`) and add an entry to `fonts/manifest.json`. For personal or non-redistributable fonts, place them inside `custom-fonts/` (any subfolder layout works).
 
 ## Limits
 
